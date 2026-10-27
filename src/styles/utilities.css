@@ -1,0 +1,226 @@
+/**
+ * Lightweight utility classes powered by Open Props and Traaace design tokens.
+ * Enables clean, concise class attributes in TypeScript component templates
+ * without requiring heavy frameworks or external runtimes.
+ */
+
+/* Display */
+.flex { display: flex; }
+.inline-flex { display: inline-flex; }
+.grid { display: grid; }
+.block { display: block; }
+.hidden { display: none; }
+
+/* Flexbox Layout */
+.flex-col { flex-direction: column; }
+.flex-row { flex-direction: row; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-nowrap { flex-wrap: nowrap; }
+.flex-1 { flex: 1 1 0%; }
+.flex-auto { flex: 1 1 auto; }
+.flex-none { flex: none; }
+.flex-shrink-0 { flex-shrink: 0; }
+.flex-grow { flex-grow: 1; }
+
+/* Alignment */
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.items-end { align-items: flex-end; }
+.items-stretch { align-items: stretch; }
+.items-baseline { align-items: baseline; }
+
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.justify-start { justify-content: flex-start; }
+.justify-end { justify-content: flex-end; }
+
+/* Spacing: Gaps (Open Props sizes) */
+.gap-1 { gap: var(--size-1); }
+.gap-2 { gap: var(--size-2); }
+.gap-3 { gap: var(--size-3); }
+.gap-4 { gap: var(--size-4); }
+.gap-5 { gap: var(--size-5); }
+.gap-6 { gap: var(--size-6); }
+.gap-8 { gap: var(--size-8); }
+.gap-10 { gap: var(--size-10); }
+.gap-12 { gap: var(--size-12); }
+
+/* Padding (Open Props sizes) */
+.p-0 { padding: 0; }
+.p-1 { padding: var(--size-1); }
+.p-2 { padding: var(--size-2); }
+.p-3 { padding: var(--size-3); }
+.p-4 { padding: var(--size-4); }
+.p-5 { padding: var(--size-5); }
+.p-6 { padding: var(--size-6); }
+.p-8 { padding: var(--size-8); }
+
+.px-2 { padding-inline: var(--size-2); }
+.px-3 { padding-inline: var(--size-3); }
+.px-4 { padding-inline: var(--size-4); }
+.px-6 { padding-inline: var(--size-6); }
+
+.py-1 { padding-block: var(--size-1); }
+.py-2 { padding-block: var(--size-2); }
+.py-3 { padding-block: var(--size-3); }
+.py-4 { padding-block: var(--size-4); }
+
+.pt-1 { padding-top: var(--size-1); }
+.pt-2 { padding-top: var(--size-2); }
+.pt-3 { padding-top: var(--size-3); }
+.pt-4 { padding-top: var(--size-4); }
+.pt-5 { padding-top: var(--size-5); }
+.pt-6 { padding-top: var(--size-6); }
+.pt-8 { padding-top: var(--size-8); }
+
+.pb-1 { padding-bottom: var(--size-1); }
+.pb-2 { padding-bottom: var(--size-2); }
+.pb-3 { padding-bottom: var(--size-3); }
+.pb-4 { padding-bottom: var(--size-4); }
+.pb-5 { padding-bottom: var(--size-5); }
+.pb-6 { padding-bottom: var(--size-6); }
+.pb-8 { padding-bottom: var(--size-8); }
+
+/* Margin (Open Props sizes) */
+.m-auto { margin: auto; }
+.mx-auto { margin-inline: auto; }
+.my-auto { margin-block: auto; }
+
+.mt-1 { margin-top: var(--size-1); }
+.mt-2 { margin-top: var(--size-2); }
+.mt-3 { margin-top: var(--size-3); }
+.mt-4 { margin-top: var(--size-4); }
+.mt-6 { margin-top: var(--size-6); }
+
+.mb-1 { margin-bottom: var(--size-1); }
+.mb-2 { margin-bottom: var(--size-2); }
+.mb-3 { margin-bottom: var(--size-3); }
+.mb-4 { margin-bottom: var(--size-4); }
+
+/* Dimensions */
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.min-h-0 { min-height: 0; }
+.min-w-0 { min-width: 0; }
+.max-w-prose { max-width: var(--size-content-3, 60ch); }
+.max-w-dialog { max-width: 560px; }
+
+/* Overflow */
+.overflow-hidden { overflow: hidden; }
+.overflow-auto { overflow: auto; }
+.overflow-y-auto { overflow-y: auto; }
+.overflow-x-auto { overflow-x: auto; }
+
+/* Typography */
+.text-xs { font-size: var(--text-xs); }
+.text-sm { font-size: var(--text-sm); }
+.text-base { font-size: var(--text-base); }
+.text-md { font-size: var(--text-md); }
+.text-lg { font-size: var(--text-lg); }
+.text-xl { font-size: var(--text-xl); }
+.text-2xl { font-size: var(--text-2xl); }
+
+.font-sans { font-family: var(--font-sans) !important; }
+.font-mono { font-family: var(--font-mono) !important; }
+
+.font-normal { font-weight: 400; }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+
+.text-main { color: var(--color-text-main); }
+.text-muted { color: var(--color-text-muted); }
+.text-faint { color: var(--color-text-faint); }
+.text-brand { color: var(--color-brand); }
+.text-danger { color: var(--color-danger); }
+.text-success { color: var(--color-success); }
+.text-warning { color: var(--color-warning); }
+
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-left { text-align: left; }
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cursor-pointer { cursor: pointer; }
+
+/* Dimensions */
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+
+/* Grid Layouts */
+.grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* Common Structural Surface Classes */
+.page-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-6) var(--space-12) var(--space-6);
+  max-width: 1040px;
+  margin-inline: auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.surface-card {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.inner-card {
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Button utility modifiers */
+.btn-sm {
+  padding: 2px 8px;
+  font-size: var(--text-xs);
+}
+
+/* Borders & Radii (Open Props radii) */
+.border { border: 1px solid var(--color-border); }
+.border-b { border-bottom: 1px solid var(--color-border); }
+.border-t { border-top: 1px solid var(--color-border); }
+.border-subtle { border-color: var(--color-border-subtle); }
+.border-strong { border-color: var(--color-border-strong); }
+
+.rounded-xs { border-radius: var(--radius-xs); }
+.rounded-sm { border-radius: var(--radius-sm); }
+.rounded-md { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
+.rounded-xl { border-radius: var(--radius-xl); }
+.rounded-full { border-radius: var(--radius-full); }
+
+/* Backgrounds */
+.bg-base { background-color: var(--color-bg-base); }
+.bg-surface { background-color: var(--color-bg-surface); }
+.bg-surface-raised { background-color: var(--color-bg-surface-raised); }
+.bg-subtle { background-color: var(--color-bg-subtle); }
+
+/* Elevation Shadows (Open Props) */
+.shadow-1 { box-shadow: var(--shadow-1); }
+.shadow-2 { box-shadow: var(--shadow-2); }
+.shadow-3 { box-shadow: var(--shadow-3); }
+.shadow-4 { box-shadow: var(--shadow-4); }
+
+/* Animations (Open Props) */
+.animate-fade-in { animation: var(--animation-fade-in) forwards; }
+.animate-scale-down { animation: var(--animation-scale-down) forwards; }

@@ -1,0 +1,10 @@
+src-tauri/data/
+src-tauri/data/**
+src-tauri/*.sqlite*
+src-tauri/settings.json
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+settings.json

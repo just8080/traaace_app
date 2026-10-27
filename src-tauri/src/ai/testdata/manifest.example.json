@@ -1,0 +1,141 @@
+{
+  "schema": 1,
+  "pack": "traaace-ai",
+  "version": "1.0.0",
+  "published": "2026-11-01T00:00:00Z",
+  "min_app_version": "0.6.0",
+  "notice": {
+    "title": "AI species detection",
+    "requires_acceptance": true,
+    "credits": [
+      "Alita (New Zealand species classifier), version 3.03: Olly and wekaResearch, with the Department of Conservation Predator Science team. Everyone involved is listed at https://github.com/Wologman/Alita",
+      "MegaDetector v5a (animal detection): Dan Morris and contributors, https://github.com/agentmorris/MegaDetector",
+      "ONNX Runtime: Microsoft, MIT licence"
+    ],
+    "licenses": [
+      "GPL-3.0 (inherited from MegaDetector / YOLOv5)",
+      "MIT (ONNX Runtime)"
+    ]
+  },
+  "model": {
+    "id": "alita-3.03",
+    "display_name": "Alita (New Zealand species)",
+    "classes": 81,
+    "detector_component": "detector",
+    "classifier_component": "classifier",
+    "class_names_component": "class-names",
+    "name_map_component": "name-map",
+    "defaults": {
+      "classifier_threshold": 0.5,
+      "detector_empty_threshold": 0.15,
+      "count_threshold": 0.2
+    },
+    "score_kind": "uncalibrated",
+    "calibration": null,
+    "source": {
+      "name": "Alita 3.03 official release (Exp_60, run_01)",
+      "classifier_sha256": "60517850013cd8677986a316654a9f410955c06e3b75c4e31841f07cabd0bba0",
+      "detector_sha256": "94e88fe97c8050f2e3d0cc4cb4f64729d639d74312dcbe2f74f8eecd3b01b276"
+    }
+  },
+  "components": [
+    {
+      "id": "classifier",
+      "kind": "model",
+      "platforms": [
+        "*"
+      ],
+      "install_path": "models/classifier.onnx",
+      "download": {
+        "url": "https://github.com/OWNER/REPO/releases/download/ai-pack-v1.0.0/classifier.onnx.gz",
+        "compression": "gzip",
+        "size": 78245901,
+        "sha256": "7305b1032621885ff0efe4de0344c4b6390dfc75c1b2568b0a5b3840b4e55286"
+      },
+      "unpacked": {
+        "size": 84113605,
+        "sha256": "942dbb724012e52ad3491db4202ef08e29944f907043a593768b0bb528b14da2"
+      },
+      "required": true
+    },
+    {
+      "id": "detector",
+      "kind": "model",
+      "platforms": [
+        "*"
+      ],
+      "install_path": "models/detector.onnx",
+      "download": {
+        "url": "https://github.com/OWNER/REPO/releases/download/ai-pack-v1.0.0/detector.onnx.gz",
+        "compression": "gzip",
+        "size": 448887204,
+        "sha256": "ca2d4d01908c4eb57b9c3524e316edd041509ca85b9bc7b6dd197e0066d70a1d"
+      },
+      "unpacked": {
+        "size": 561710008,
+        "sha256": "9c6f27127c3b9485c22ef930e9f5c652bd54b5d6d3f0a2a76df50d6104c4e981"
+      },
+      "required": true
+    },
+    {
+      "id": "class-names",
+      "kind": "data",
+      "platforms": [
+        "*"
+      ],
+      "install_path": "models/class_names.json",
+      "download": {
+        "url": "https://github.com/OWNER/REPO/releases/download/ai-pack-v1.0.0/class_names.json.gz",
+        "compression": "gzip",
+        "size": 457,
+        "sha256": "946909ca3d988bfa760ce1fa49749a2647833558eb7ab27f37149d80ddf52c6f"
+      },
+      "unpacked": {
+        "size": 966,
+        "sha256": "4cd3ac8ed0ddcd762d3873381b244dc173d45acf9bfd0c25db19a2abb5d27f65"
+      },
+      "required": true
+    },
+    {
+      "id": "name-map",
+      "kind": "data",
+      "platforms": [
+        "*"
+      ],
+      "install_path": "models/name_map.csv",
+      "required": false,
+      "download": {
+        "url": "https://github.com/OWNER/REPO/releases/download/ai-pack-v1.0.0/name_map.csv.gz",
+        "compression": "gzip",
+        "size": 2022,
+        "sha256": "6f9c559d220bd483a0b00ce06f9c6309d5efec62c29b7724b207ebc2cbb29b2a"
+      },
+      "unpacked": {
+        "size": 3852,
+        "sha256": "28e7fb3e208ecbb27d8ca972714e88ec032d49b908687c96fda7c82f367f570d"
+      }
+    },
+    {
+      "id": "onnxruntime",
+      "kind": "runtime",
+      "platforms": [
+        "macos-aarch64"
+      ],
+      "install_path": "runtime/libonnxruntime.1.31.0.dylib",
+      "download": {
+        "url": "https://github.com/OWNER/REPO/releases/download/ai-pack-v1.0.0/macos-aarch64-libonnxruntime.1.31.0.dylib.gz",
+        "compression": "gzip",
+        "size": 9090922,
+        "sha256": "8cae15c4ea96846c6874c251dfa61a6380e5056ce1c5cc9b68441753f590ed34"
+      },
+      "unpacked": {
+        "size": 33037336,
+        "sha256": "8fb7b56da8bfbb699bbbb0c580772a80aa433f4422a664f647551a6878e07db9"
+      },
+      "required": true,
+      "version": "1.31.0",
+      "ort_api": 31,
+      "min_os": "macOS 14"
+    }
+  ]
+}

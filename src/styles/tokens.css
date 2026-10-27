@@ -1,0 +1,136 @@
+@import "open-props/open-props.min.css";
+@import "open-props/animations.min.css";
+
+:root {
+  /* Font stack */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+
+  /* Typography scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 2rem;
+
+  --tracking-tight: -0.015em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.025em;
+
+  /* Spacing */
+  --space-1: var(--size-1, 0.25rem);
+  --space-2: var(--size-2, 0.5rem);
+  --space-3: var(--size-3, 0.75rem);
+  --space-4: var(--size-4, 1rem);
+  --space-5: var(--size-5, 1.25rem);
+  --space-6: var(--size-6, 1.5rem);
+  --space-8: var(--size-8, 2rem);
+  --space-10: var(--size-10, 2.5rem);
+  --space-12: var(--size-12, 3rem);
+
+  /* Radius - Crisp modern desktop scale (clean, professional - not oversized pills or bubbles) */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-full: 9999px;
+
+  /* Shadows backed by Open Props multi-layer shadows */
+  --shadow-sm: var(--shadow-1, 0 1px 2px rgba(0, 0, 0, 0.2));
+  --shadow-md: var(--shadow-2, 0 4px 6px -1px rgba(0, 0, 0, 0.3));
+  --shadow-lg: var(--shadow-3, 0 10px 15px -3px rgba(0, 0, 0, 0.4));
+  --shadow-xl: var(--shadow-5, 0 20px 25px -5px rgba(0, 0, 0, 0.5));
+
+  /* Transitions & Easings */
+  --transition-fast: 120ms var(--ease-out-3, cubic-bezier(0.16, 1, 0.3, 1));
+  --transition-normal: 200ms var(--ease-out-3, cubic-bezier(0.16, 1, 0.3, 1));
+  --transition-smooth: 320ms var(--ease-out-3, cubic-bezier(0.16, 1, 0.3, 1));
+  --transition-bounce: 300ms var(--ease-squish-1, cubic-bezier(0.5, -0.5, 0.1, 1.5));
+}
+
+/* Default Dark Theme */
+:root,
+[data-theme="dark"] {
+  --color-bg-base: #101214;
+  --color-bg-surface: #181b1f;
+  --color-bg-surface-raised: #21252b;
+  --color-bg-surface-elevated: #282d35;
+  --color-bg-subtle: #1c2026;
+
+  --color-border: #2d333b;
+  --color-border-subtle: #242930;
+  --color-border-strong: #444c56;
+  --color-border-focus: #539bf5;
+
+  --color-text-main: #f0f3f6;
+  --color-text-muted: #9da7b3;
+  --color-text-faint: #636e7b;
+  --color-text-inverse: #0d1117;
+
+  /* Accents */
+  --color-brand: #2ea043;
+  --color-brand-hover: #3fb950;
+  --color-brand-subtle: rgba(46, 160, 67, 0.15);
+
+  --color-accent: #2f81f7;
+  --color-accent-hover: #58a6ff;
+  --color-accent-subtle: rgba(47, 129, 247, 0.15);
+
+  --color-warning: #d29922;
+  --color-warning-subtle: rgba(210, 153, 34, 0.15);
+
+  --color-danger: #f85149;
+  --color-danger-subtle: rgba(248, 81, 73, 0.15);
+
+  --color-success: #2ea043;
+  --color-success-subtle: rgba(46, 160, 67, 0.15);
+
+  --color-stage-bg: #0e1013;
+  --color-overlay-bg: rgba(24, 27, 31, 0.9);
+
+  /* Welcome card and drop zone card icons*/
+  --color-quick-icon: #f59e0b;
+}
+
+/* Light Theme (Clean, Crisp, Low-eye-strain) */
+[data-theme="light"] {
+  --color-bg-base: #f6f8fa;
+  --color-bg-surface: #ffffff;
+  --color-bg-surface-raised: #f3f4f6;
+  --color-bg-surface-elevated: #eaeef2;
+  --color-bg-subtle: #f0f2f5;
+
+  --color-border: #d0d7de;
+  --color-border-subtle: #e1e4e8;
+  --color-border-strong: #afb8c1;
+  --color-border-focus: #0969da;
+
+  --color-text-main: #1f2328;
+  --color-text-muted: #57606a;
+  --color-text-faint: #8c959f;
+  --color-text-inverse: #ffffff;
+
+  --color-brand: #1a7f37;
+  --color-brand-hover: #2da44e;
+  --color-brand-subtle: rgba(26, 127, 55, 0.12);
+
+  --color-accent: #0969da;
+  --color-accent-hover: #218bff;
+  --color-accent-subtle: rgba(9, 105, 218, 0.12);
+
+  --color-warning: #9a6700;
+  --color-warning-subtle: rgba(154, 103, 0, 0.12);
+
+  --color-danger: #cf222e;
+  --color-danger-subtle: rgba(207, 34, 46, 0.12);
+
+  --color-success: #1a7f37;
+  --color-success-subtle: rgba(26, 127, 55, 0.12);
+
+  --color-stage-bg: #f0f2f5;
+  --color-overlay-bg: rgba(255, 255, 255, 0.95);
+}

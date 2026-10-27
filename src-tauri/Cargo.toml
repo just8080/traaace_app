@@ -1,0 +1,72 @@
+[package]
+name = "traaace-v2"
+version = "0.6.0"
+description = "A Tauri App"
+authors = ["TRAAACE"]
+license = "GPL-3.0-only"
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "traaace_v2_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-log = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+rusqlite = { version = "0.32", features = ["bundled"] }
+walkdir = "2.5"
+chrono = { version = "0.4", features = ["serde"] }
+base64 = "0.22"
+zip = "2.2"
+tokio = { version = "1", features = ["sync", "rt", "macros", "fs"] }
+rust_xlsxwriter = "0.99.1"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+rayon = "1.10"
+tauri-plugin-window-state = "2"
+# On-device species detection. `ai` loads ONNX Runtime from a file at run time (the downloadable AI
+# pack), so the app itself stays small. `ai-static` links a copy in instead, for benchmarking only.
+ort = { version = "2.0.0-rc.15", optional = true, default-features = false, features = ["std", "ndarray", "coreml", "api-31"] }
+ndarray = { version = "0.17", optional = true }
+# Downloading the AI add-on: the OS's own TLS (about 0.6 MB, vs 1.5 MB for rustls), gzip, and checksums.
+ureq = { version = "3", optional = true, default-features = false, features = ["native-tls"] }
+flate2 = { version = "1", optional = true }
+sha2 = { version = "0.10", optional = true }
+# Checking the add-on download list is signed with our key (minisign format, Ed25519).
+minisign-verify = { version = "0.3.0", optional = true }
+
+[features]
+# The AI code is in every build (it adds well under 1 MB); the models and ONNX Runtime come later as the optional add-on.
+default = ["ai"]
+ai = ["dep:ort", "dep:ndarray", "ort/load-dynamic", "dep:ureq", "dep:flate2", "dep:sha2", "dep:minisign-verify"]
+ai-static = ["ai", "ort/download-binaries", "ort/tls-native", "ort/copy-dylibs"]
+
+[[example]]
+name = "ai_scan"
+required-features = ["ai"]
+
+
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
+
+[dev-dependencies]
+minisign = "0.10.0"

@@ -1,0 +1,91 @@
+/* Inter Font Family */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block; /* bundled, so it loads at once: no fallback font to swap away from */
+  src: url('../assets/fonts/inter/Inter-roman.var.woff2') format('woff2-variations'),
+       url('../assets/fonts/inter/Inter-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: block; /* bundled, so it loads at once: no fallback font to swap away from */
+  src: url('../assets/fonts/inter/Inter-italic.var.woff2') format('woff2-variations');
+}
+
+/* Fallback static weights */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block; /* bundled, so it loads at once: no fallback font to swap away from */
+  src: url('../assets/fonts/inter/Inter-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: block; /* bundled, so it loads at once: no fallback font to swap away from */
+  src: url('../assets/fonts/inter/Inter-Medium.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: block; /* bundled, so it loads at once: no fallback font to swap away from */
+  src: url('../assets/fonts/inter/Inter-SemiBold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block; /* bundled, so it loads at once: no fallback font to swap away from */
+  src: url('../assets/fonts/inter/Inter-Bold.woff2') format('woff2');
+}
+
+/* JetBrains Mono Font Family */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block; /* bundled, so it loads at once: no fallback font to swap away from */
+  src: url('../assets/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: italic;
+  font-weight: 400;
+  font-display: block; /* bundled, so it loads at once: no fallback font to swap away from */
+  src: url('../assets/fonts/jetbrains-mono/JetBrainsMono-Italic.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: block; /* bundled, so it loads at once: no fallback font to swap away from */
+  src: url('../assets/fonts/jetbrains-mono/JetBrainsMono-Medium.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: block; /* bundled, so it loads at once: no fallback font to swap away from */
+  src: url('../assets/fonts/jetbrains-mono/JetBrainsMono-SemiBold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block; /* bundled, so it loads at once: no fallback font to swap away from */
+  src: url('../assets/fonts/jetbrains-mono/JetBrainsMono-Bold.woff2') format('woff2');
+}

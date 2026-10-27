@@ -1,0 +1,182 @@
+name: Release
+
+# Publishes installers. Push a tag that matches the app version, for example:
+#   git tag v0.5.1 && git push origin v0.5.1
+# The workflow builds Windows, Linux and macOS (Apple Silicon and Intel) installers and attaches them to a draft
+# release. For a normal version tag (v0.5.1) it then publishes the release by itself once every build has succeeded,
+# and the website's download buttons pick it up. A tag with a suffix (v0.5.1-test1) stays a DRAFT pre-release:
+# nothing is visible until you open the draft on GitHub, read it over and press Publish.
+#
+# Where the release goes: this repository by default. To publish to the website's repository instead (where the
+# download buttons look), set the repository variable RELEASE_REPO (for example just8080/traaace_web) and the secret
+# RELEASE_TOKEN.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_REPO: ${{ vars.RELEASE_REPO || github.repository }}
+
+jobs:
+  check-version:
+    name: Check the tag matches the app version
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare versions
+        run: |
+          package=$(node -p "require('./package.json').version")
+          tauri=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          cargo=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1)
+          echo "package.json=$package tauri.conf.json=$tauri Cargo.toml=$cargo tag=$GITHUB_REF_NAME"
+          if [ "$package" != "$tauri" ] || [ "$package" != "$cargo" ]; then
+            echo "::error::The versions in package.json, tauri.conf.json and Cargo.toml must all match."
+            exit 1
+          fi
+          case "$GITHUB_REF_NAME" in
+            "v$package" | "v$package"-*) ;;
+            *) echo "::error::Tag $GITHUB_REF_NAME does not match app version $package (expected v$package or v$package-<suffix>)."; exit 1 ;;
+          esac
+
+      - name: Check the release destination
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          echo "Releases will be published to: $RELEASE_REPO"
+          if [ "$RELEASE_REPO" != "$GITHUB_REPOSITORY" ] && [ -z "$RELEASE_TOKEN" ]; then
+            echo "::error::RELEASE_REPO is set to $RELEASE_REPO but the RELEASE_TOKEN secret is missing. Add it under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+  create-release:
+    name: Create the draft release
+    needs: check-version
+    runs-on: ubuntu-22.04
+    outputs:
+      release_id: ${{ steps.create.outputs.release_id }}
+      owner: ${{ steps.create.outputs.owner }}
+      repo: ${{ steps.create.outputs.repo }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create a draft release
+        id: create
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          # A tag such as v0.5.1-test1 (anything after a dash) is a test release; v0.5.1 is the real thing.
+          case "$GITHUB_REF_NAME" in *-*) prerelease=true ;; *) prerelease=false ;; esac
+          id=$(gh api "repos/$RELEASE_REPO/releases" \
+            -f tag_name="$GITHUB_REF_NAME" \
+            -f name="TRAAACE $GITHUB_REF_NAME" \
+            -F draft=true -F prerelease=$prerelease \
+            -F body=@.github/release-body.md \
+            --jq .id)
+          echo "release_id=$id" >> "$GITHUB_OUTPUT"
+          echo "owner=${RELEASE_REPO%%/*}" >> "$GITHUB_OUTPUT"
+          echo "repo=${RELEASE_REPO#*/}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS Apple Silicon
+            platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - name: macOS Intel
+            platform: macos-15-intel
+            args: --target x86_64-apple-darwin
+          - name: Linux
+            platform: ubuntu-22.04
+            args: ''
+          - name: Windows
+            platform: windows-latest
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'pnpm'
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          # Both Mac targets are installed so either runner can build either architecture.
+          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: 'src-tauri'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build and attach the installers
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+        with:
+          owner: ${{ needs.create-release.outputs.owner }}
+          repo: ${{ needs.create-release.outputs.repo }}
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          args: ${{ matrix.args }}
+
+  tidy-release:
+    name: Keep only the installers people need
+    needs: [create-release, build]
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: ubuntu-22.04
+    steps:
+      # The Tauri build also produces a Linux .rpm and macOS .app.tar.gz update bundles; people don't need them.
+      - name: Delete the extra files
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+        run: |
+          gh api "repos/$RELEASE_REPO/releases/$RELEASE_ID/assets" --paginate \
+            --jq '.[] | select(.name | test("\\.rpm$|\\.app\\.tar\\.gz$")) | .id' |
+          while read -r id; do
+            gh api -X DELETE "repos/$RELEASE_REPO/releases/assets/$id"
+          done
+
+  publish:
+    name: Publish the release
+    needs: [create-release, build, tidy-release]
+    # Only a normal version tag (no dash) goes live by itself, and only when every build and the tidy-up succeeded.
+    if: ${{ !cancelled() && needs.tidy-release.result == 'success' && !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Make the draft public and mark it as the latest release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+        run: |
+          gh api -X PATCH "repos/$RELEASE_REPO/releases/$RELEASE_ID" \
+            -F draft=false -F prerelease=false -f make_latest=true
