@@ -6,6 +6,10 @@ import { icon } from '../services/icons';
 import { html, escapeHtml, isVideoFile } from '../utils';
 import { ZoomPanController } from './classifier/zoom-pan';
 import { GridThumbnails } from './classifier/grid-thumbnails';
+import {
+  NO_FILTER, filterIndices, isFilterActive, matchSpeciesOptions, pageOf, snapToFiltered, speciesOptions, stepFiltered,
+  type GridFilter,
+} from './classifier/grid-filter';
 import { CommentDropdown } from './classifier/comment-dropdown';
 import { KeyboardController } from './classifier/keyboard';
 import { SidebarResizer } from './classifier/sidebar-resizer';
@@ -58,6 +62,18 @@ export class ClassifierView extends HTMLElement {
   private readonly gridThumbnails = new GridThumbnails();
   private gridPage = 0;
   private readonly pageSize = 48;
+
+  // Grid filters. They are remembered while switching between Single and Grid view, and reset
+  // when a new folder or batch is opened.
+  private gridFilter: GridFilter = NO_FILTER;
+  /**
+   * Photos the filtered grid shows. Kept fixed while you work so a photo you just tagged doesn't
+   * vanish from under you; refreshed when the filter changes or the grid is opened again.
+   */
+  private filteredIndices: number[] | null = null;
+  /** The photo list the filters were set for; a different list means a new folder or batch. */
+  private filterSource: unknown = null;
+  private speciesMenuHighlight = 0;
 
   private readonly keyboard = new KeyboardController(this, {
     hasItems: () => this.getUnifiedItems().length > 0,
@@ -171,6 +187,54 @@ export class ClassifierView extends HTMLElement {
     return items[idx];
   }
 
+  // ============================================================
+  // Grid Filters
+  // ============================================================
+  private isGridFiltered(): boolean {
+    return this.getViewMode() === 'grid' && isFilterActive(this.gridFilter);
+  }
+
+  /** Positions (in the full photo list) of the photos the grid shows. */
+  private getVisibleIndices(items: UnifiedPhotoItem[]): number[] {
+    const source = this.mode === 'quick' ? quickStore.items : projectStore.activeBatchMedia?.items;
+    if (source !== this.filterSource) {
+      this.filterSource = source;
+      this.gridFilter = NO_FILTER;
+      this.filteredIndices = null;
+    }
+    if (!isFilterActive(this.gridFilter)) return items.map((_, i) => i);
+    if (!this.filteredIndices) this.filteredIndices = filterIndices(items, this.gridFilter);
+    return this.filteredIndices.filter(i => i < items.length);
+  }
+
+  /** False when a grid filter hides the current photo, so hotkeys can't tag a photo you can't see. */
+  private hasTaggablePhoto(): boolean {
+    const items = this.getUnifiedItems();
+    if (items.length === 0) return false;
+    if (!this.isGridFiltered()) return true;
+    return this.getVisibleIndices(items).includes(this.getCurrentIndex());
+  }
+
+  private setGridFilter(filter: GridFilter): void {
+    this.gridFilter = filter;
+    this.filteredIndices = null;
+    const items = this.getUnifiedItems();
+    const visible = this.getVisibleIndices(items);
+    const idx = this.getCurrentIndex();
+    this.isStructureBuilt = false;
+    if (isFilterActive(filter)) {
+      // Start on page 1, keeping the current photo selected if it is there.
+      this.gridPage = 0;
+      if (visible.length > 0 && pageOf(visible, idx, this.pageSize) !== 0) {
+        this.goToPhoto(visible[0]);
+      }
+    } else {
+      // Filter cleared: back to the page with the current photo.
+      this.gridPage = Math.floor(idx / this.pageSize);
+    }
+    this.render();
+  }
+
   private getTitle(): string {
     if (this.mode === 'quick') {
       return quickStore.folderName || 'Quick Session';
@@ -194,9 +258,14 @@ export class ClassifierView extends HTMLElement {
   private setViewMode(vm: 'single' | 'grid'): void {
     this.isStructureBuilt = false;
     this.lastViewMode = vm;
+    let snapTo: number | null = null;
     if (vm === 'grid') {
+      // Reopening the grid refreshes the filtered list (photos tagged since then drop out).
+      this.filteredIndices = null;
       const idx = this.getCurrentIndex();
-      this.gridPage = Math.floor(idx / this.pageSize);
+      const visible = this.getVisibleIndices(this.getUnifiedItems());
+      snapTo = snapToFiltered(visible, idx);
+      this.gridPage = pageOf(visible, snapTo ?? idx, this.pageSize) ?? 0;
     }
     if (this.mode === 'quick') {
       quickStore.setViewMode(vm);
@@ -204,6 +273,7 @@ export class ClassifierView extends HTMLElement {
       projectStore.viewMode = vm;
       this.render();
     }
+    if (snapTo !== null && snapTo !== this.getCurrentIndex()) this.goToPhoto(snapTo);
   }
 
   private advanceDelayPercent(ms: number): number {
@@ -254,6 +324,7 @@ export class ClassifierView extends HTMLElement {
   // ============================================================
   private classifyCurrent(species: string, comment?: string, count?: number, advance?: boolean): void {
     this.keyboard.clear();
+    if (!this.hasTaggablePhoto()) return;
     const finalComment = comment !== undefined ? comment : this.getCurrentInputComment();
     const finalCount = count !== undefined ? count : this.getCurrentInputCount();
 
@@ -329,6 +400,10 @@ export class ClassifierView extends HTMLElement {
   }
 
   private nextPhoto(): void {
+    if (this.isGridFiltered()) {
+      this.stepGridFiltered(1);
+      return;
+    }
     this.keyboard.clear();
     this.zoomPan.reset();
     if (this.mode === 'quick') {
@@ -339,6 +414,10 @@ export class ClassifierView extends HTMLElement {
   }
 
   private prevPhoto(): void {
+    if (this.isGridFiltered()) {
+      this.stepGridFiltered(-1);
+      return;
+    }
     this.keyboard.clear();
     this.zoomPan.reset();
     if (this.mode === 'quick') {
@@ -346,6 +425,13 @@ export class ClassifierView extends HTMLElement {
     } else {
       projectStore.prevMedia();
     }
+  }
+
+  /** Next / previous photo within the filtered grid. */
+  private stepGridFiltered(delta: 1 | -1): void {
+    const target = stepFiltered(this.getVisibleIndices(this.getUnifiedItems()), this.getCurrentIndex(), delta);
+    if (target !== null) this.goToPhoto(target);
+    else this.keyboard.clear();
   }
 
   private goToPhoto(idx: number): void {
@@ -399,8 +485,9 @@ export class ClassifierView extends HTMLElement {
 
   private setupWindowClickCloser(): void {
     window.addEventListener('click', (e: MouseEvent) => {
-      if (!this.commentDropdown.isOpen) return;
       const target = e.target as HTMLElement;
+      if (!target.closest('#gridSpeciesFilter')) this.closeSpeciesMenu();
+      if (!this.commentDropdown.isOpen) return;
       if (!target.closest('#commentComboboxWrap') && !target.closest('#toolbarCommentBadge')) {
         this.commentDropdown.close();
       }
@@ -455,8 +542,18 @@ export class ClassifierView extends HTMLElement {
     }
 
     if (currentVm === 'grid') {
-      const expectedPage = Math.floor(this.getCurrentIndex() / this.pageSize);
-      if (expectedPage !== this.gridPage) {
+      const visible = this.getVisibleIndices(items);
+      const idx = this.getCurrentIndex();
+      if (isFilterActive(this.gridFilter)) {
+        // Auto-advance can land on a photo the filter hides: move on to the next one shown.
+        const snapped = snapToFiltered(visible, idx);
+        if (snapped !== null && snapped !== idx) {
+          this.goToPhoto(snapped);
+          return;
+        }
+      }
+      const expectedPage = pageOf(visible, idx, this.pageSize);
+      if (expectedPage !== null && expectedPage !== this.gridPage) {
         this.gridPage = expectedPage;
         this.isStructureBuilt = false;
         this.render();
@@ -663,6 +760,122 @@ export class ClassifierView extends HTMLElement {
     }
   }
 
+  // ============================================================
+  // Grid Filter Controls
+  // ============================================================
+  private bindGridFilterControls(): void {
+    this.querySelector<HTMLButtonElement>('#btnGridUnclassifiedOnly')?.addEventListener('click', (e) => {
+      // Release focus so Space and the hotkeys tag photos instead of pressing this button again.
+      (e.currentTarget as HTMLElement).blur();
+      this.setGridFilter({ unclassifiedOnly: !this.gridFilter.unclassifiedOnly, species: null });
+    });
+
+    const input = this.querySelector<HTMLInputElement>('#inputGridSpeciesFilter');
+    if (!input) return;
+    input.addEventListener('focus', () => {
+      input.select();
+      this.openSpeciesMenu('');
+    });
+    input.addEventListener('input', () => this.openSpeciesMenu(input.value));
+    input.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this.moveSpeciesHighlight(e.key === 'ArrowDown' ? 1 : -1);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const highlighted = this.querySelector<HTMLElement>('#gridSpeciesMenu .combobox-option-item.highlighted');
+        if (highlighted) this.pickSpecies(highlighted.dataset.species ?? null);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.closeSpeciesMenu();
+        input.blur();
+      }
+    });
+    input.addEventListener('blur', () => {
+      // Put back the chosen species if the typed text was not picked.
+      this.closeSpeciesMenu();
+      input.value = this.gridFilter.species ?? '';
+    });
+
+    const toggle = this.querySelector('#btnToggleGridSpecies');
+    // mousedown is cancelled so the input keeps focus (and its menu) while the arrow is pressed.
+    toggle?.addEventListener('mousedown', (e) => e.preventDefault());
+    toggle?.addEventListener('click', () => {
+      if (this.querySelector<HTMLElement>('#gridSpeciesMenu')?.style.display !== 'none') {
+        input.blur();
+      } else if (document.activeElement === input) {
+        this.openSpeciesMenu('');
+      } else {
+        input.focus();
+      }
+    });
+    this.querySelector('#btnClearGridSpecies')?.addEventListener('click', () => this.pickSpecies(null));
+  }
+
+  /** Shows the species list, narrowed to names containing `query`. */
+  private openSpeciesMenu(query: string): void {
+    const menu = this.querySelector<HTMLElement>('#gridSpeciesMenu');
+    if (!menu) return;
+    const options = matchSpeciesOptions(speciesOptions(this.getUnifiedItems()), query);
+    const rows: Array<{ species: string | null; label: string; count?: number }> = [];
+    if (!query.trim()) rows.push({ species: null, label: 'All species' });
+    options.forEach(o => rows.push({ species: o.species, label: o.species, count: o.count }));
+
+    menu.replaceChildren();
+    if (rows.length === 0) {
+      const none = document.createElement('div');
+      none.className = 'grid-species-none';
+      none.textContent = 'No matching species';
+      menu.appendChild(none);
+    }
+    rows.forEach(row => {
+      const el = document.createElement('div');
+      el.className = 'combobox-option-item';
+      el.setAttribute('role', 'option');
+      if (row.species === this.gridFilter.species) el.classList.add('selected');
+      if (row.species !== null) el.dataset.species = row.species;
+      const label = document.createElement('span');
+      label.textContent = row.label;
+      el.appendChild(label);
+      if (row.count !== undefined) {
+        const count = document.createElement('span');
+        count.className = 'grid-species-count';
+        count.textContent = String(row.count);
+        el.appendChild(count);
+      }
+      // mousedown, not click, so the input's blur doesn't close the menu first.
+      el.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        this.pickSpecies(row.species);
+      });
+      menu.appendChild(el);
+    });
+    menu.style.display = 'flex';
+    // Highlight the chosen species when the list first opens, else the best match.
+    const selected = rows.findIndex(r => r.species === this.gridFilter.species);
+    this.speciesMenuHighlight = !query.trim() && selected >= 0 ? selected : 0;
+    this.moveSpeciesHighlight(0);
+  }
+
+  private moveSpeciesHighlight(delta: number): void {
+    const opts = [...this.querySelectorAll<HTMLElement>('#gridSpeciesMenu .combobox-option-item')];
+    if (opts.length === 0) return;
+    this.speciesMenuHighlight = Math.max(0, Math.min(opts.length - 1, this.speciesMenuHighlight + delta));
+    opts.forEach((el, i) => el.classList.toggle('highlighted', i === this.speciesMenuHighlight));
+    opts[this.speciesMenuHighlight].scrollIntoView({ block: 'nearest' });
+  }
+
+  private closeSpeciesMenu(): void {
+    const menu = this.querySelector<HTMLElement>('#gridSpeciesMenu');
+    if (menu) menu.style.display = 'none';
+  }
+
+  private pickSpecies(species: string | null): void {
+    this.closeSpeciesMenu();
+    this.querySelector<HTMLInputElement>('#inputGridSpeciesFilter')?.blur();
+    this.setGridFilter({ unclassifiedOnly: false, species });
+  }
+
   private async render(): Promise<void> {
     const items = this.getUnifiedItems();
     if (items.length === 0) {
@@ -690,15 +903,21 @@ export class ClassifierView extends HTMLElement {
     const currentComment = item?.comment || '';
     const currentCount = item?.count || 1;
 
-    // Grid pagination bounds
+    // Grid pagination bounds, over the photos the filters let through
+    const visible = isGrid ? this.getVisibleIndices(items) : [];
+    const filtered = isGrid && isFilterActive(this.gridFilter);
+    const shown = visible.length;
     const pageSize = this.pageSize;
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const totalPages = Math.max(1, Math.ceil(shown / pageSize));
     if (this.gridPage >= totalPages) this.gridPage = totalPages - 1;
     if (this.gridPage < 0) this.gridPage = 0;
 
     const pageStart = this.gridPage * pageSize;
-    const pageEnd = Math.min(pageStart + pageSize, total);
-    const pageItems = items.slice(pageStart, pageEnd);
+    const pageEnd = Math.min(pageStart + pageSize, shown);
+    const pageIndices = visible.slice(pageStart, pageEnd);
+    const emptyFilterText = this.gridFilter.unclassifiedOnly
+      ? 'No unclassified photos left. Turn off “Unclassified” to see them all.'
+      : `No photos tagged “${this.gridFilter.species ?? ''}”.`;
 
     // Load initial image src if needed
     if (item && !this.currentImageSrc) {
@@ -771,8 +990,10 @@ export class ClassifierView extends HTMLElement {
       }).join('');
     }
 
-    const gridCardsHtml = isGrid ? pageItems.map((it, localIdx) => {
-      const globalIdx = pageStart + localIdx;
+    const gridCardsHtml = !isGrid ? '' : shown === 0
+      ? `<div class="grid-filter-empty">${escapeHtml(emptyFilterText)}</div>`
+      : pageIndices.map(globalIdx => {
+      const it = items[globalIdx];
       const isCurrent = globalIdx === idx;
       const isClass = it.isClassified;
       const cachedSrc = this.gridThumbnails.getCached(it.fullPath);
@@ -802,7 +1023,7 @@ export class ClassifierView extends HTMLElement {
           </div>
         </div>
       `;
-    }).join('') : '';
+    }).join('');
 
     const dateFormatted = item?.timestamp ? new Date(item.timestamp).toLocaleString() : 'No Date Recorded';
 
@@ -998,11 +1219,40 @@ export class ClassifierView extends HTMLElement {
             <div class="grid-page-header">
               <div
                 style="display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--color-text-muted);">
-                <span>Showing photos <strong>${pageStart + 1}–${pageEnd}</strong> of <strong>${total}</strong></span>
+                ${shown === 0 ? html`
+                <span>No photos match this filter</span>
+                ` : html`
+                <span>Showing photos <strong>${pageStart + 1}–${pageEnd}</strong> of <strong>${shown}</strong></span>
+                `}
+                ${filtered ? html`
+                <span style="opacity: 0.4;">•</span>
+                <span>filtered from ${total}</span>
+                ` : ''}
                 <span style="opacity: 0.4;">•</span>
                 <span>Double-click photo for Single View</span>
               </div>
               <div style="display: flex; align-items: center; gap: var(--space-2);">
+                <!-- Filters: unclassified only, or one species (picking one turns the other off) -->
+                <button type="button" class="grid-filter-toggle ${this.gridFilter.unclassifiedOnly ? 'on' : ''}"
+                  id="btnGridUnclassifiedOnly" role="switch" aria-checked="${this.gridFilter.unclassifiedOnly}"
+                  title="Show only photos that are not tagged yet">
+                  <span class="grid-filter-switch" aria-hidden="true"></span>
+                  Unclassified
+                </button>
+                <div class="grid-species-filter ${this.gridFilter.species !== null ? 'active' : ''}" id="gridSpeciesFilter">
+                  <div class="combobox-input-group">
+                    <input type="text" id="inputGridSpeciesFilter" class="combobox-input" placeholder="All species"
+                      value="${escapeHtml(this.gridFilter.species ?? '')}" autocomplete="off" spellcheck="false"
+                      aria-label="Filter by species" title="Show only one species (type to search)" />
+                    ${this.gridFilter.species !== null ? html`
+                    <button type="button" class="btn-ghost" id="btnClearGridSpecies" title="Show all species">${icon('close')}</button>
+                    ` : ''}
+                    <button type="button" class="btn-ghost" id="btnToggleGridSpecies" tabindex="-1"
+                      style="padding: 2px 6px; font-size: 10px;" title="Show species">▼</button>
+                  </div>
+                  <div id="gridSpeciesMenu" class="comment-menu-dropdown grid-species-menu" role="listbox" style="display: none;"></div>
+                </div>
+                <span class="grid-filter-divider" aria-hidden="true"></span>
                 <button type="button" class="btn-ghost" id="btnGridPrevPage" ${this.gridPage === 0 ? 'disabled' : ''}
                   style="padding: 2px 8px; font-size: 11px;">
                   ◀ Prev Page
@@ -1321,6 +1571,8 @@ export class ClassifierView extends HTMLElement {
         this.render();
       }
     });
+
+    this.bindGridFilterControls();
 
     // Date Editor Button (Both Quick and Project modes)
     this.querySelector('#btnToolbarEditDate')?.addEventListener('click', () => {
