@@ -647,6 +647,71 @@ fn thumbnail_cache_key(source: &std::path::Path, mtime_nanos: u128, len: u64) ->
     format!("{:016x}", hash)
 }
 
+/// Where the cached thumbnail for `source` lives (photos and videos share the cache).
+fn thumbnail_dest(source: &std::path::Path, cache_dir: &std::path::Path) -> std::path::PathBuf {
+    let (mtime_nanos, len) = std::fs::metadata(source)
+        .map(|m| {
+            let nanos = m
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map_or(0, |d| d.as_nanos());
+            (nanos, m.len())
+        })
+        .unwrap_or((0, 0));
+    cache_dir.join(format!("{}.webp", thumbnail_cache_key(source, mtime_nanos, len)))
+}
+
+fn thumbnail_cache_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    use tauri::Manager;
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| e.to_string())?
+        .join("thumbnails");
+    std::fs::create_dir_all(&cache_dir).map_err(|e| e.to_string())?;
+    let _ = app.asset_protocol_scope().allow_directory(&cache_dir, true);
+    Ok(cache_dir)
+}
+
+/// Shrinks a video frame to grid size and caches it. Lossless WebP like the photo thumbnails.
+fn save_video_thumbnail_to(frame: image::DynamicImage, dest: &std::path::Path) -> Result<String, String> {
+    frame.thumbnail(320, 320).save(dest).map_err(|e| e.to_string())?;
+    Ok(dest.to_string_lossy().into_owned())
+}
+
+/// A video's grid thumbnail: the cached one, else a frame read with the AI add-on's video tool. None when neither is
+/// there, and the web view then tries to grab a frame itself (see `save_video_thumbnail`).
+#[tauri::command]
+pub async fn get_video_thumbnail(app: tauri::AppHandle, path: String) -> Result<Option<String>, String> {
+    let cache_dir = thumbnail_cache_dir(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let source = std::path::Path::new(&path);
+        let dest = thumbnail_dest(source, &cache_dir);
+        if dest.exists() {
+            return Ok(Some(dest.to_string_lossy().into_owned()));
+        }
+        match crate::ai_commands::video_frame(&app, source) {
+            Some(frame) => save_video_thumbnail_to(frame.into(), &dest).map(Some),
+            None => Ok(None),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Caches a frame the web view grabbed from a video (an encoded picture, e.g. JPEG) as that video's thumbnail.
+#[tauri::command]
+pub async fn save_video_thumbnail(app: tauri::AppHandle, path: String, frame: Vec<u8>) -> Result<String, String> {
+    let cache_dir = thumbnail_cache_dir(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let image = image::load_from_memory(&frame).map_err(|e| format!("Not a picture: {e}"))?;
+        save_video_thumbnail_to(image, &thumbnail_dest(std::path::Path::new(&path), &cache_dir))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 fn create_thumbnail(source: &std::path::Path, cache_dir: &std::path::Path) -> Result<String, String> {
     let ext = source
         .extension()
@@ -659,18 +724,7 @@ fn create_thumbnail(source: &std::path::Path, cache_dir: &std::path::Path) -> Re
         return Ok(source.to_string_lossy().into_owned());
     }
 
-    let (mtime_nanos, len) = std::fs::metadata(source)
-        .map(|m| {
-            let nanos = m
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map_or(0, |d| d.as_nanos());
-            (nanos, m.len())
-        })
-        .unwrap_or((0, 0));
-
-    let dest = cache_dir.join(format!("{}.webp", thumbnail_cache_key(source, mtime_nanos, len)));
+    let dest = thumbnail_dest(source, cache_dir);
 
     if !dest.exists() {
         if let Ok(img) = image::open(source) {
@@ -737,8 +791,18 @@ pub async fn generate_thumbnails(app: tauri::AppHandle, paths: Vec<String>) -> R
 
 #[cfg(test)]
 mod tests {
-    use super::thumbnail_cache_key;
+    use super::{save_video_thumbnail_to, thumbnail_cache_key};
     use std::path::Path;
+
+    #[test]
+    fn a_video_frame_is_shrunk_to_grid_size_and_cached() {
+        let dest = std::env::temp_dir().join(format!("traaace-video-thumb-test-{}.webp", std::process::id()));
+        let frame = image::DynamicImage::new_rgb8(1920, 1080);
+        save_video_thumbnail_to(frame, &dest).unwrap();
+        let saved = image::open(&dest).unwrap();
+        let _ = std::fs::remove_file(&dest);
+        assert_eq!((saved.width(), saved.height()), (320, 180));
+    }
 
     #[test]
     fn thumbnail_key_is_stable() {

@@ -4,7 +4,8 @@ import { confirm as tauriConfirm } from '@tauri-apps/plugin-dialog';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type { MediaItem, ExportConfig } from '../types';
 import type * as Ipc from '../ipc-types';
-import { isVideoFile } from '../utils';
+import { canPreviewVideo, isVideoFile } from '../utils';
+import { grabVideoFrame } from './video-frame';
 
 export { convertFileSrc };
 
@@ -152,6 +153,26 @@ export async function getThumbnailSrc(filePath: string): Promise<string> {
     return convertFileSrc(filePath);
   }
   return readMediaDataUri(filePath);
+}
+
+/**
+ * A video's grid thumbnail: the cached one, else a frame from the AI add-on's video tool, else one grabbed by the web
+ * view (for formats it can play), which is then cached too. '' when no frame can be read.
+ */
+export async function getVideoThumbnailSrc(filePath: string): Promise<string> {
+  if (!isTauriEnvironment() || !filePath) return '';
+  try {
+    const cached = await invoke<string | null>('get_video_thumbnail', { path: filePath });
+    if (cached) return convertFileSrc(cached);
+    if (!canPreviewVideo(filePath)) return '';
+    const frame = await grabVideoFrame(await readMediaDataUri(filePath));
+    if (!frame) return '';
+    const bytes = Array.from(new Uint8Array(await frame.arrayBuffer()));
+    return convertFileSrc(await invoke<string>('save_video_thumbnail', { path: filePath, frame: bytes }));
+  } catch (err) {
+    console.warn('video thumbnail error:', err);
+    return '';
+  }
 }
 
 export function generateThumbnailsBackground(paths: string[]): void {

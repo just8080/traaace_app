@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  NO_FILTER, filterIndices, isFilterActive, matchSpeciesOptions, pageOf, snapToFiltered, speciesOptions, stepFiltered,
+  NO_FILTER, filterIndices, isFilterActive, matchSpeciesOptions, pageOf, skipTaggedAfterAdvance, snapToFiltered, speciesOptions,
+  stepFiltered,
 } from './grid-filter';
 
 const tagged = (species: string) => ({ species, isClassified: true });
@@ -78,5 +79,24 @@ describe('navigation within the filtered list', () => {
     expect(pageOf(many, 94, 48)).toBe(0);
     expect(pageOf(many, 96, 48)).toBe(1);
     expect(pageOf(many, 3, 48)).toBeNull();
+  });
+});
+
+describe('skipTaggedAfterAdvance (Single view, Unclassified on)', () => {
+  // Unclassified photos are at 1, 4 and 7.
+  it('moves past tagged photos after auto-advance', () => {
+    expect(skipTaggedAfterAdvance(items, 1, 2)).toBe(4);
+    expect(skipTaggedAfterAdvance(items, 4, 5)).toBe(7);
+  });
+
+  it('stays when the next photo is unclassified, or none are left', () => {
+    expect(skipTaggedAfterAdvance(items, 3, 4)).toBeNull();
+    expect(skipTaggedAfterAdvance([tagged('Deer'), tagged('Deer')], 0, 1)).toBeNull();
+  });
+
+  it('ignores moves that are not one step forward', () => {
+    expect(skipTaggedAfterAdvance(items, 0, 2)).toBeNull();
+    expect(skipTaggedAfterAdvance(items, 3, 2)).toBeNull();
+    expect(skipTaggedAfterAdvance(items, 2, 2)).toBeNull();
   });
 });

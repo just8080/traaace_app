@@ -169,6 +169,12 @@ pub fn ai_scan_cancel(state: State<AiState>) {
     state.cancel.store(true, Ordering::SeqCst);
 }
 
+/// One frame of a video for its grid thumbnail, read with the add-on's `ffmpeg`. None without the add-on or its video
+/// tool, or when the video can't be read.
+pub fn video_frame(app: &tauri::AppHandle, video: &std::path::Path) -> Option<image::RgbImage> {
+    imp::video_frame(app, video)
+}
+
 #[cfg(not(feature = "ai"))]
 mod imp {
     use super::*;
@@ -204,6 +210,10 @@ mod imp {
     pub fn start(_: tauri::AppHandle, _: Vec<AiScanFile>, _: Vec<String>, _: Option<String>, _: &AiState) -> Result<(), String> {
         Err("This build of TRAAACE does not include AI support.".to_string())
     }
+
+    pub fn video_frame(_: &tauri::AppHandle, _: &std::path::Path) -> Option<image::RgbImage> {
+        None
+    }
 }
 
 #[cfg(feature = "ai")]
@@ -224,6 +234,13 @@ mod imp {
             return Err(format!("TRAAACE_AI_PACK points to {dir}, but that folder doesn't exist."));
         }
         pack::locate_first(&pack::candidate_dirs(chosen, env.as_deref(), &app_data))
+    }
+
+    /// The frame a second in, or the first frame when the clip is shorter than that.
+    pub fn video_frame(app: &tauri::AppHandle, video: &std::path::Path) -> Option<image::RgbImage> {
+        use crate::ai::video::{Ffmpeg, FrameSource};
+        let ffmpeg = Ffmpeg { program: find_pack(app, None).ok()?.video_tool? };
+        ffmpeg.frame_at(video, 1.0).or_else(|| ffmpeg.frame_at(video, 0.0))
     }
 
     fn install_root(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {

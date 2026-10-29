@@ -988,6 +988,11 @@ image-viewer {
   border-color: var(--color-brand);
 }
 
+/* Single view toolbar: just the switch, its name in the tooltip */
+.grid-filter-toggle.compact {
+  padding: 5px 6px;
+}
+
 .grid-filter-switch {
   position: relative;
   width: 22px;
@@ -2690,6 +2695,33 @@ image-viewer {
 }
 
 /* Grid card for a video: a light placeholder, so thumbnails never decode video files */
+/* A video's frame covers its icon once loaded; the corner badge then marks it as a video */
+.grid-card-thumb-wrap .grid-card-video-thumb {
+  position: absolute;
+  inset: 0;
+}
+
+/* Invisible rather than display: none, so the lazy loader still sees it scroll into view */
+.grid-card-video-thumb:not([src]) {
+  visibility: hidden;
+}
+
+.grid-card-video-thumb:not([src]) ~ .grid-card-video-badge {
+  display: none;
+}
+
+.grid-card-video-badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  pointer-events: none;
+}
+
 .grid-card-video {
   width: 100%;
   height: 100%;

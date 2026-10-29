@@ -85,3 +85,15 @@ export function pageOf(indices: number[], current: number, pageSize: number): nu
   const pos = indices.indexOf(current);
   return pos < 0 ? null : Math.floor(pos / pageSize);
 }
+
+export const UNCLASSIFIED_ONLY: GridFilter = { unclassifiedOnly: true, species: null };
+
+/**
+ * Single view with "Unclassified" on: after auto-advance moves one photo on (`previous` + 1) and lands on a tagged
+ * photo, the next unclassified photo to go to instead. Null to stay (not an auto-advance, already unclassified,
+ * or none left).
+ */
+export function skipTaggedAfterAdvance(items: FilterableItem[], previous: number, current: number): number | null {
+  if (current !== previous + 1 || !items[current]?.isClassified) return null;
+  return stepFiltered(filterIndices(items, UNCLASSIFIED_ONLY), current, 1);
+}

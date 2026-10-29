@@ -1,6 +1,6 @@
 [package]
 name = "traaace-v2"
-version = "0.6.1"
+version = "0.6.2"
 description = "A Tauri App"
 authors = ["TRAAACE"]
 license = "GPL-3.0-only"

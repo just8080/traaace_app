@@ -7,7 +7,8 @@ import { html, escapeHtml, isVideoFile } from '../utils';
 import { ZoomPanController } from './classifier/zoom-pan';
 import { GridThumbnails } from './classifier/grid-thumbnails';
 import {
-  NO_FILTER, filterIndices, isFilterActive, matchSpeciesOptions, pageOf, snapToFiltered, speciesOptions, stepFiltered,
+  NO_FILTER, UNCLASSIFIED_ONLY, filterIndices, isFilterActive, matchSpeciesOptions, pageOf, skipTaggedAfterAdvance,
+  snapToFiltered, speciesOptions, stepFiltered,
   type GridFilter,
 } from './classifier/grid-filter';
 import { CommentDropdown } from './classifier/comment-dropdown';
@@ -74,6 +75,8 @@ export class ClassifierView extends HTMLElement {
   /** The photo list the filters were set for; a different list means a new folder or batch. */
   private filterSource: unknown = null;
   private speciesMenuHighlight = 0;
+  /** Current photo at the last store update, to spot auto-advance in Single view. */
+  private lastSeenIndex = -1;
 
   private readonly keyboard = new KeyboardController(this, {
     hasItems: () => this.getUnifiedItems().length > 0,
@@ -196,15 +199,20 @@ export class ClassifierView extends HTMLElement {
 
   /** Positions (in the full photo list) of the photos the grid shows. */
   private getVisibleIndices(items: UnifiedPhotoItem[]): number[] {
+    this.resetFiltersForNewSource();
+    if (!isFilterActive(this.gridFilter)) return items.map((_, i) => i);
+    if (!this.filteredIndices) this.filteredIndices = filterIndices(items, this.gridFilter);
+    return this.filteredIndices.filter(i => i < items.length);
+  }
+
+  /** Clears the filters when a new folder or batch has been opened. */
+  private resetFiltersForNewSource(): void {
     const source = this.mode === 'quick' ? quickStore.items : projectStore.activeBatchMedia?.items;
     if (source !== this.filterSource) {
       this.filterSource = source;
       this.gridFilter = NO_FILTER;
       this.filteredIndices = null;
     }
-    if (!isFilterActive(this.gridFilter)) return items.map((_, i) => i);
-    if (!this.filteredIndices) this.filteredIndices = filterIndices(items, this.gridFilter);
-    return this.filteredIndices.filter(i => i < items.length);
   }
 
   /** False when a grid filter hides the current photo, so hotkeys can't tag a photo you can't see. */
@@ -400,8 +408,8 @@ export class ClassifierView extends HTMLElement {
   }
 
   private nextPhoto(): void {
-    if (this.isGridFiltered()) {
-      this.stepGridFiltered(1);
+    if (this.isNavFiltered()) {
+      this.stepFilteredPhoto(1);
       return;
     }
     this.keyboard.clear();
@@ -414,8 +422,8 @@ export class ClassifierView extends HTMLElement {
   }
 
   private prevPhoto(): void {
-    if (this.isGridFiltered()) {
-      this.stepGridFiltered(-1);
+    if (this.isNavFiltered()) {
+      this.stepFilteredPhoto(-1);
       return;
     }
     this.keyboard.clear();
@@ -427,9 +435,16 @@ export class ClassifierView extends HTMLElement {
     }
   }
 
-  /** Next / previous photo within the filtered grid. */
-  private stepGridFiltered(delta: 1 | -1): void {
-    const target = stepFiltered(this.getVisibleIndices(this.getUnifiedItems()), this.getCurrentIndex(), delta);
+  /** True when next / previous skip photos: any grid filter, or "Unclassified" in Single view. */
+  private isNavFiltered(): boolean {
+    return this.isGridFiltered() || (this.getViewMode() === 'single' && this.gridFilter.unclassifiedOnly);
+  }
+
+  /** Next / previous photo the filter lets through. Single view uses the live list, so tagged photos are skipped. */
+  private stepFilteredPhoto(delta: 1 | -1): void {
+    const items = this.getUnifiedItems();
+    const indices = this.getViewMode() === 'grid' ? this.getVisibleIndices(items) : filterIndices(items, UNCLASSIFIED_ONLY);
+    const target = stepFiltered(indices, this.getCurrentIndex(), delta);
     if (target !== null) this.goToPhoto(target);
     else this.keyboard.clear();
   }
@@ -533,12 +548,25 @@ export class ClassifierView extends HTMLElement {
       return;
     }
 
+    this.resetFiltersForNewSource();
+    const previousIndex = this.lastSeenIndex;
+    this.lastSeenIndex = this.getCurrentIndex();
+
     const currentVm = this.getViewMode();
     if (this.lastViewMode !== currentVm) {
       this.lastViewMode = currentVm;
       this.isStructureBuilt = false;
       this.render();
       return;
+    }
+
+    if (currentVm === 'single' && this.gridFilter.unclassifiedOnly) {
+      // Auto-advance after tagging: skip photos that are already tagged.
+      const target = skipTaggedAfterAdvance(items, previousIndex, this.lastSeenIndex);
+      if (target !== null) {
+        this.goToPhoto(target);
+        return;
+      }
     }
 
     if (currentVm === 'grid') {
@@ -764,6 +792,16 @@ export class ClassifierView extends HTMLElement {
   // Grid Filter Controls
   // ============================================================
   private bindGridFilterControls(): void {
+    const singleSwitch = this.querySelector<HTMLButtonElement>('#btnSingleUnclassified');
+    singleSwitch?.addEventListener('click', () => {
+      // Release focus so Space and the hotkeys tag photos instead of pressing this button again.
+      singleSwitch.blur();
+      this.gridFilter = { unclassifiedOnly: !this.gridFilter.unclassifiedOnly, species: null };
+      this.filteredIndices = null;
+      singleSwitch.classList.toggle('on', this.gridFilter.unclassifiedOnly);
+      singleSwitch.setAttribute('aria-checked', String(this.gridFilter.unclassifiedOnly));
+    });
+
     this.querySelector<HTMLButtonElement>('#btnGridUnclassifiedOnly')?.addEventListener('click', (e) => {
       // Release focus so Space and the hotkeys tag photos instead of pressing this button again.
       (e.currentTarget as HTMLElement).blur();
@@ -892,6 +930,7 @@ export class ClassifierView extends HTMLElement {
       return;
     }
 
+    this.resetFiltersForNewSource();
     const idx = this.getCurrentIndex();
     const item = this.getActiveItem();
     const total = items.length;
@@ -1001,7 +1040,9 @@ export class ClassifierView extends HTMLElement {
         <div class="grid-card ${isCurrent ? 'active' : ''} ${isClass ? 'classified' : ''}" data-idx="${globalIdx}" id="gridCard_${globalIdx}">
           <div class="grid-card-thumb-wrap">
             ${isVideoFile(it.fileName)
-              ? `<div class="grid-card-video" title="${escapeHtml(it.fileName)}">${icon('video', { size: 30 })}<span>${escapeHtml(it.fileName.slice(it.fileName.lastIndexOf('.') + 1).toUpperCase())}</span></div>`
+              ? `<div class="grid-card-video" title="${escapeHtml(it.fileName)}">${icon('video', { size: 30 })}<span>${escapeHtml(it.fileName.slice(it.fileName.lastIndexOf('.') + 1).toUpperCase())}</span></div>
+                 <img class="grid-card-thumb grid-card-video-thumb" data-video ${cachedSrc ? `src="${escapeHtml(cachedSrc)}"` : ''} data-path="${escapeHtml(it.fullPath)}" alt="${escapeHtml(it.fileName)}" decoding="async" />
+                 <span class="grid-card-video-badge">${icon('video', { size: 14 })}</span>`
               : `<img class="grid-card-thumb" src="${escapeHtml(cachedSrc)}" data-path="${escapeHtml(it.fullPath)}" alt="${escapeHtml(it.fileName)}" loading="lazy" decoding="async" />`}
           </div>
           <div class="grid-card-info">
@@ -1116,6 +1157,15 @@ export class ClassifierView extends HTMLElement {
                   style="padding: 1px 5px; font-size: 11px; height: 20px; width: 20px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer;"
                   title="Increase count (+)">+</button>
               </div>
+
+              <!-- 5. Unclassified switch (Single Mode; the grid has its own in the page header) -->
+              ${!isGrid ? html`
+              <button type="button" class="grid-filter-toggle compact ${this.gridFilter.unclassifiedOnly ? 'on' : ''}"
+                id="btnSingleUnclassified" role="switch" aria-checked="${this.gridFilter.unclassifiedOnly}"
+                aria-label="Unclassified" title="Unclassified">
+                <span class="grid-filter-switch" aria-hidden="true"></span>
+              </button>
+              ` : ''}
       
             </div>
       

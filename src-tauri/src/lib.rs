@@ -152,6 +152,8 @@ pub fn run() {
             commands::update_file_timestamp,
             commands::get_or_create_thumbnail,
             commands::generate_thumbnails,
+            commands::get_video_thumbnail,
+            commands::save_video_thumbnail,
 
             // Optional AI add-on
             ai_commands::ai_status,
